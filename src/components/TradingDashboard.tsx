@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -28,6 +29,25 @@ import {
 } from "@/components/ui/sidebar";
 
 const TradingDashboard = () => {
+  const [aiSignals, setAiSignals] = useState<any[]>([]);
+
+useEffect(() => {
+  const fetchSignals = async () => {
+    const { data, error } = await supabase
+      .from("ai_signals")
+      .select("*")
+      .order("timestamp", { ascending: false });
+
+    if (error) {
+      console.error("Supabase fetch error:", error.message);
+    } else {
+      console.log("Signals from Supabase:", data);
+      setAiSignals(data);
+    }
+  };
+
+  fetchSignals();
+}, []);
   const [activeSection, setActiveSection] = useState("dashboard");
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
 
@@ -45,24 +65,7 @@ const TradingDashboard = () => {
     { symbol: "BTC", price: 67420.50, change: 1250.30, changePercent: 1.89 },
     { symbol: "ETH", price: 3842.15, change: -85.45, changePercent: -2.18 },
   ];
-
-  const aiSignals = [
-    {
-      symbol: "AAPL",
-      signal: "BUY",
-      confidence: 87,
-      reasoning: "Strong momentum + positive earnings sentiment",
-      risk: "Medium"
-    },
-    {
-      symbol: "TSLA",
-      signal: "HOLD",
-      confidence: 72,
-      reasoning: "Mixed technical indicators, wait for breakout",
-      risk: "High"
-    },
-  ];
-
+  
   const handleRefresh = () => {
     setLastUpdated(new Date().toLocaleTimeString());
   };
