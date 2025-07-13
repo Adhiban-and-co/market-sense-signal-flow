@@ -61,6 +61,24 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				profit: {
+					DEFAULT: 'hsl(var(--profit))',
+					foreground: 'hsl(var(--profit-foreground))'
+				},
+				loss: {
+					DEFAULT: 'hsl(var(--loss))',
+					foreground: 'hsl(var(--loss-foreground))'
+				},
+				warning: {
+					DEFAULT: 'hsl(var(--warning))',
+					foreground: 'hsl(var(--warning-foreground))'
+				},
+				chart: {
+					primary: 'hsl(var(--chart-primary))',
+					secondary: 'hsl(var(--chart-secondary))',
+					tertiary: 'hsl(var(--chart-tertiary))',
+					quaternary: 'hsl(var(--chart-quaternary))'
 				}
 			},
 			borderRadius: {
