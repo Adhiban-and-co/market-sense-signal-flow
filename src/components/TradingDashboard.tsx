@@ -12,6 +12,10 @@ import {
   DollarSign,
   BarChart3
 } from "lucide-react";
+import AISignalCenter from "./AISignalCenter";
+import PortfolioManager from "./PortfolioManager";
+import BacktestingEngine from "./BacktestingEngine";
+import UserSettings from "./UserSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -204,57 +208,10 @@ useEffect(() => {
               </>
             )}
 
-            {activeSection === "signals" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>AI Signal Center</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center text-muted-foreground py-8">
-                    AI Signal Center coming soon...
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {activeSection === "backtest" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Backtesting Engine</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center text-muted-foreground py-8">
-                    Backtesting Engine coming soon...
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {activeSection === "portfolio" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Portfolio Management</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center text-muted-foreground py-8">
-                    Portfolio Management coming soon...
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {activeSection === "settings" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center text-muted-foreground py-8">
-                    Settings coming soon...
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {activeSection === "signals" && <AISignalCenter />}
+            {activeSection === "backtest" && <BacktestingEngine />}
+            {activeSection === "portfolio" && <PortfolioManager />}
+            {activeSection === "settings" && <UserSettings />}
           </div>
         </main>
       </div>
