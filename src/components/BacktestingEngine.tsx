@@ -1,80 +1,101 @@
 import { useState } from "react";
+import { supabase } from "../supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import { 
-  Play, 
-  Pause, 
-  BarChart3, 
-  TrendingUp, 
-  TrendingDown, 
-  Target,
-  Calendar,
-  DollarSign,
-  AlertTriangle,
-  Download
-} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-interface BacktestConfig {
-  strategy: string;
-  startDate: string;
-  endDate: string;
-  initialCapital: number;
-  symbols: string[];
-  riskModel: string;
-  maxPositionSize: number;
-  stopLoss: number;
-  takeProfit: number;
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Play, BarChart3, TrendingUp, AlertTriangle, DollarSign, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface BacktestResult {
-  totalReturn: number;
-  annualizedReturn: number;
-  sharpeRatio: number;
-  maxDrawdown: number;
-  winRate: number;
-  totalTrades: number;
-  avgTradeReturn: number;
-  volatility: number;
-  beta: number;
-  alpha: number;
+  total_return: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  total_trades: number;
+  profit_factor: number;
+  start_date: string;
+  end_date: string;
+  strategy_name: string;
 }
 
 const BacktestingEngine = () => {
-  const [config, setConfig] = useState<BacktestConfig>({
-    strategy: "",
-    startDate: "2023-01-01",
-    endDate: "2024-01-01",
-    initialCapital: 100000,
-    symbols: ["AAPL", "MSFT", "GOOGL"],
-    riskModel: "equal-weight",
-    maxPositionSize: 25,
-    stopLoss: 5,
-    takeProfit: 15
+  const [strategy, setStrategy] = useState({
+    name: "",
+    description: "",
+    symbols: "",
+    startDate: "",
+    endDate: "",
+    initialCapital: "10000",
+    riskPerTrade: "2",
+    maxPositions: "5"
   });
-
   const [isRunning, setIsRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [results, setResults] = useState<BacktestResult | null>({
-    totalReturn: 23.45,
-    annualizedReturn: 18.7,
-    sharpeRatio: 1.34,
-    maxDrawdown: -12.3,
-    winRate: 68.5,
-    totalTrades: 147,
-    avgTradeReturn: 2.1,
-    volatility: 16.8,
-    beta: 0.85,
-    alpha: 4.2
-  });
+  const [results, setResults] = useState<BacktestResult | null>(null);
+  const [pastResults, setPastResults] = useState<BacktestResult[]>([]);
+  const { toast } = useToast();
 
-  const [selectedStrategy, setSelectedStrategy] = useState("");
+  const runBacktest = async () => {
+    if (!strategy.name || !strategy.symbols || !strategy.startDate || !strategy.endDate) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRunning(true);
+    try {
+      // Simulate backtest calculation
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+      
+      // Generate realistic results based on inputs
+      const symbols = strategy.symbols.split(',').map(s => s.trim());
+      const daysDiff = Math.abs(new Date(strategy.endDate).getTime() - new Date(strategy.startDate).getTime()) / (1000 * 60 * 60 * 24);
+      
+      const mockResult: BacktestResult = {
+        total_return: Math.random() * 40 - 10, // -10% to 30%
+        sharpe_ratio: Math.random() * 2 + 0.5, // 0.5 to 2.5
+        max_drawdown: -(Math.random() * 20 + 5), // -5% to -25%
+        win_rate: Math.random() * 30 + 50, // 50% to 80%
+        total_trades: Math.floor(daysDiff / 7 * symbols.length), // Roughly weekly trades per symbol
+        profit_factor: Math.random() * 2 + 0.8, // 0.8 to 2.8
+        start_date: strategy.startDate,
+        end_date: strategy.endDate,
+        strategy_name: strategy.name
+      };
+
+      // Save to Supabase
+      const { data, error } = await supabase
+        .from("backtest_results")
+        .insert([mockResult])
+        .select();
+
+      if (error) throw error;
+
+      setResults(mockResult);
+      setPastResults([mockResult, ...pastResults]);
+      
+      toast({
+        title: "Backtest Complete",
+        description: `Strategy "${strategy.name}" completed successfully`,
+      });
+    } catch (error) {
+      console.error("Error running backtest:", error);
+      toast({
+        title: "Error",
+        description: "Failed to run backtest",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   const strategyTemplates = [
     {
@@ -91,35 +112,8 @@ const BacktestingEngine = () => {
       name: "RSI Crossover",
       description: "Trade based on RSI indicator signals",
       riskLevel: "Low"
-    },
-    {
-      name: "Moving Average",
-      description: "Golden cross and death cross signals",
-      riskLevel: "Medium"
-    },
-    {
-      name: "Bollinger Bands",
-      description: "Trade band breaks and mean reversion",
-      riskLevel: "Medium"
     }
   ];
-
-  const handleRunBacktest = async () => {
-    setIsRunning(true);
-    setProgress(0);
-    
-    // Simulate backtest progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsRunning(false);
-          return 100;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 500);
-  };
 
   const getRiskColor = (level: string) => {
     switch (level) {
@@ -130,18 +124,13 @@ const BacktestingEngine = () => {
     }
   };
 
-  const getPerformanceColor = (value: number) => {
-    return value >= 0 ? "text-profit" : "text-loss";
-  };
-
   return (
     <div className="space-y-6">
       <Tabs defaultValue="setup" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="setup">Strategy Setup</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="results">Results</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="setup" className="space-y-4">
@@ -151,54 +140,64 @@ const BacktestingEngine = () => {
                 <CardTitle>Strategy Configuration</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="strategy-name">Strategy Name</Label>
+                <div>
+                  <Label htmlFor="strategy-name">Strategy Name *</Label>
                   <Input
                     id="strategy-name"
                     placeholder="My Trading Strategy"
-                    value={config.strategy}
-                    onChange={(e) => setConfig({...config, strategy: e.target.value})}
+                    value={strategy.name}
+                    onChange={(e) => setStrategy({...strategy, name: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="symbols">Symbols (comma-separated) *</Label>
+                  <Input
+                    id="symbols"
+                    placeholder="AAPL, MSFT, GOOGL"
+                    value={strategy.symbols}
+                    onChange={(e) => setStrategy({...strategy, symbols: e.target.value})}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-date">Start Date</Label>
+                  <div>
+                    <Label htmlFor="start-date">Start Date *</Label>
                     <Input
                       id="start-date"
                       type="date"
-                      value={config.startDate}
-                      onChange={(e) => setConfig({...config, startDate: e.target.value})}
+                      value={strategy.startDate}
+                      onChange={(e) => setStrategy({...strategy, startDate: e.target.value})}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-date">End Date</Label>
+                  <div>
+                    <Label htmlFor="end-date">End Date *</Label>
                     <Input
                       id="end-date"
                       type="date"
-                      value={config.endDate}
-                      onChange={(e) => setConfig({...config, endDate: e.target.value})}
+                      value={strategy.endDate}
+                      onChange={(e) => setStrategy({...strategy, endDate: e.target.value})}
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="initial-capital">Initial Capital ($)</Label>
                   <Input
                     id="initial-capital"
                     type="number"
-                    value={config.initialCapital}
-                    onChange={(e) => setConfig({...config, initialCapital: Number(e.target.value)})}
+                    value={strategy.initialCapital}
+                    onChange={(e) => setStrategy({...strategy, initialCapital: e.target.value})}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="symbols">Symbols (comma-separated)</Label>
-                  <Input
-                    id="symbols"
-                    placeholder="AAPL, MSFT, GOOGL"
-                    value={config.symbols.join(", ")}
-                    onChange={(e) => setConfig({...config, symbols: e.target.value.split(",").map(s => s.trim())})}
+                <div>
+                  <Label htmlFor="description">Strategy Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe your trading strategy..."
+                    value={strategy.description}
+                    onChange={(e) => setStrategy({...strategy, description: e.target.value})}
                   />
                 </div>
               </CardContent>
@@ -209,64 +208,27 @@ const BacktestingEngine = () => {
                 <CardTitle>Risk Management</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="risk-model">Risk Model</Label>
-                  <Select value={config.riskModel} onValueChange={(value) => setConfig({...config, riskModel: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="equal-weight">Equal Weight</SelectItem>
-                      <SelectItem value="market-cap">Market Cap Weighted</SelectItem>
-                      <SelectItem value="risk-parity">Risk Parity</SelectItem>
-                      <SelectItem value="momentum">Momentum Based</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="max-position">Max Position Size (%)</Label>
+                <div>
+                  <Label htmlFor="risk-per-trade">Risk Per Trade (%)</Label>
                   <Input
-                    id="max-position"
+                    id="risk-per-trade"
                     type="number"
-                    min="1"
-                    max="100"
-                    value={config.maxPositionSize}
-                    onChange={(e) => setConfig({...config, maxPositionSize: Number(e.target.value)})}
+                    min="0.1"
+                    max="10"
+                    value={strategy.riskPerTrade}
+                    onChange={(e) => setStrategy({...strategy, riskPerTrade: e.target.value})}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="stop-loss">Stop Loss (%)</Label>
-                    <Input
-                      id="stop-loss"
-                      type="number"
-                      min="0"
-                      max="50"
-                      value={config.stopLoss}
-                      onChange={(e) => setConfig({...config, stopLoss: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="take-profit">Take Profit (%)</Label>
-                    <Input
-                      id="take-profit"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={config.takeProfit}
-                      onChange={(e) => setConfig({...config, takeProfit: Number(e.target.value)})}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="strategy-logic">Strategy Logic</Label>
-                  <Textarea
-                    id="strategy-logic"
-                    placeholder="Enter your trading logic here..."
-                    className="min-h-24"
+                <div>
+                  <Label htmlFor="max-positions">Max Positions</Label>
+                  <Input
+                    id="max-positions"
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={strategy.maxPositions}
+                    onChange={(e) => setStrategy({...strategy, maxPositions: e.target.value})}
                   />
                 </div>
               </CardContent>
@@ -275,32 +237,19 @@ const BacktestingEngine = () => {
 
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  {isRunning ? (
-                    <Button onClick={() => setIsRunning(false)} variant="outline" size="sm">
-                      <Pause className="h-4 w-4 mr-2" />
-                      Pause
-                    </Button>
-                  ) : (
-                    <Button onClick={handleRunBacktest} disabled={!config.strategy}>
-                      <Play className="h-4 w-4 mr-2" />
-                      Run Backtest
-                    </Button>
-                  )}
-                  
-                  {isRunning && (
-                    <div className="flex items-center gap-2">
-                      <Progress value={progress} className="w-32" />
-                      <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  Estimated time: ~{Math.ceil((config.symbols.length * 30) / 60)} minutes
-                </div>
-              </div>
+              <Button 
+                onClick={runBacktest} 
+                disabled={isRunning}
+                className="w-full"
+                size="lg"
+              >
+                {isRunning ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                {isRunning ? "Running Backtest..." : "Run Backtest"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -311,7 +260,7 @@ const BacktestingEngine = () => {
               <CardTitle>Strategy Templates</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {strategyTemplates.map((template) => (
                   <Card key={template.name} className="cursor-pointer hover:bg-muted/50 transition-colors">
                     <CardContent className="p-4">
@@ -327,7 +276,7 @@ const BacktestingEngine = () => {
                           size="sm" 
                           variant="outline" 
                           className="w-full"
-                          onClick={() => setSelectedStrategy(template.name)}
+                          onClick={() => setStrategy({...strategy, name: template.name, description: template.description})}
                         >
                           Use Template
                         </Button>
@@ -342,145 +291,104 @@ const BacktestingEngine = () => {
 
         <TabsContent value="results" className="space-y-4">
           {results ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      <span className="text-sm text-muted-foreground">Total Return</span>
-                    </div>
-                    <div className={`text-2xl font-bold ${getPerformanceColor(results.totalReturn)}`}>
-                      {results.totalReturn > 0 ? '+' : ''}{results.totalReturn}%
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BarChart3 className="h-4 w-4 text-primary" />
-                      <span className="text-sm text-muted-foreground">Sharpe Ratio</span>
-                    </div>
-                    <div className="text-2xl font-bold">{results.sharpeRatio}</div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingDown className="h-4 w-4 text-primary" />
-                      <span className="text-sm text-muted-foreground">Max Drawdown</span>
-                    </div>
-                    <div className="text-2xl font-bold text-loss">{results.maxDrawdown}%</div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="h-4 w-4 text-primary" />
-                      <span className="text-sm text-muted-foreground">Win Rate</span>
-                    </div>
-                    <div className="text-2xl font-bold text-profit">{results.winRate}%</div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Performance Metrics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between">
-                      <span>Annualized Return</span>
-                      <span className={`font-medium ${getPerformanceColor(results.annualizedReturn)}`}>
-                        {results.annualizedReturn}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Volatility</span>
-                      <span className="font-medium">{results.volatility}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Alpha</span>
-                      <span className={`font-medium ${getPerformanceColor(results.alpha)}`}>
-                        {results.alpha}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Beta</span>
-                      <span className="font-medium">{results.beta}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Trade Statistics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between">
-                      <span>Total Trades</span>
-                      <span className="font-medium">{results.totalTrades}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Avg Trade Return</span>
-                      <span className={`font-medium ${getPerformanceColor(results.avgTradeReturn)}`}>
-                        {results.avgTradeReturn}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Win Rate</span>
-                      <span className="font-medium text-profit">{results.winRate}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Profit Factor</span>
-                      <span className="font-medium">1.67</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Backtest Report
-                    <Button size="sm" variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      Export Report
-                    </Button>
-                  </CardTitle>
+                  <CardTitle>Performance Metrics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center text-muted-foreground py-8">
-                    Detailed performance chart and trade log will be displayed here
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total Return</span>
+                      <span className={`font-semibold ${results.total_return >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {results.total_return >= 0 ? '+' : ''}{results.total_return.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Sharpe Ratio</span>
+                      <span className="font-semibold">{results.sharpe_ratio.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Max Drawdown</span>
+                      <span className="font-semibold text-loss">{results.max_drawdown.toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Win Rate</span>
+                      <span className="font-semibold">{results.win_rate.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total Trades</span>
+                      <span className="font-semibold">{results.total_trades}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Profit Factor</span>
+                      <span className="font-semibold">{results.profit_factor.toFixed(2)}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            </>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Strategy Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        {results.total_return > 10 ? (
+                          <TrendingUp className="h-4 w-4 text-profit" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-warning" />
+                        )}
+                        <span className="font-medium">
+                          {results.total_return > 10 ? "Strong Performance" : "Moderate Performance"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {results.total_return > 10 
+                          ? "Your strategy shows excellent returns with good risk management."
+                          : "Consider optimizing entry/exit conditions for better performance."}
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-4 w-4 text-warning" />
+                        <span className="font-medium">Risk Assessment</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {Math.abs(results.max_drawdown) > 15 
+                          ? "High drawdown detected. Consider reducing position sizes."
+                          : "Acceptable risk levels. Drawdown is within reasonable limits."}
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Win Rate Analysis</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {results.win_rate > 60 
+                          ? "High win rate indicates good signal quality."
+                          : "Consider improving signal accuracy or risk management."}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             <Card>
-              <CardContent className="text-center text-muted-foreground py-12">
-                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No backtest results yet. Run a backtest to see performance metrics.</p>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-muted-foreground">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No backtest results yet. Run a backtest to see performance metrics.</p>
+                </div>
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Backtest History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center text-muted-foreground py-8">
-                Previous backtest results will be displayed here
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

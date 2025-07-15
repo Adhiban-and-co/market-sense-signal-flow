@@ -16,6 +16,7 @@ import AISignalCenter from "./AISignalCenter";
 import PortfolioManager from "./PortfolioManager";
 import BacktestingEngine from "./BacktestingEngine";
 import UserSettings from "./UserSettings";
+import SignalGenerator from "./SignalGenerator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,7 @@ useEffect(() => {
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "signals", label: "AI Signals", icon: Zap },
+    { id: "generate", label: "Generate Signals", icon: Activity },
     { id: "backtest", label: "Backtesting", icon: Target },
     { id: "portfolio", label: "Portfolio", icon: DollarSign },
     { id: "settings", label: "Settings", icon: Settings },
@@ -209,6 +211,7 @@ useEffect(() => {
             )}
 
             {activeSection === "signals" && <AISignalCenter />}
+            {activeSection === "generate" && <SignalGenerator />}
             {activeSection === "backtest" && <BacktestingEngine />}
             {activeSection === "portfolio" && <PortfolioManager />}
             {activeSection === "settings" && <UserSettings />}

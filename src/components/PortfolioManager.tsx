@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -12,112 +17,135 @@ import {
   Target,
   AlertCircle,
   Plus,
-  Minus
+  Trash2
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-interface Holding {
+interface Portfolio {
+  id: number;
   symbol: string;
   quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  value: number;
-  gainLoss: number;
-  gainLossPercent: number;
-  allocation: number;
-}
-
-interface PortfolioMetrics {
-  totalValue: number;
-  totalGainLoss: number;
-  totalGainLossPercent: number;
-  dayChange: number;
-  dayChangePercent: number;
-  sharpeRatio: number;
-  maxDrawdown: number;
-  winRate: number;
+  avg_price: number;
+  current_price: number;
+  type: 'STOCK' | 'CRYPTO' | 'ETF';
+  created_at: string;
 }
 
 const PortfolioManager = () => {
-  const [holdings, setHoldings] = useState<Holding[]>([
-    {
-      symbol: "AAPL",
-      quantity: 50,
-      avgPrice: 150.25,
-      currentPrice: 175.50,
-      value: 8775,
-      gainLoss: 1262.50,
-      gainLossPercent: 16.78,
-      allocation: 35.1
-    },
-    {
-      symbol: "MSFT",
-      quantity: 25,
-      avgPrice: 280.00,
-      currentPrice: 295.75,
-      value: 7393.75,
-      gainLoss: 393.75,
-      gainLossPercent: 5.63,
-      allocation: 29.6
-    },
-    {
-      symbol: "GOOGL",
-      quantity: 15,
-      avgPrice: 120.50,
-      currentPrice: 135.25,
-      value: 2028.75,
-      gainLoss: 221.25,
-      gainLossPercent: 12.24,
-      allocation: 8.1
-    },
-    {
-      symbol: "TSLA",
-      quantity: 30,
-      avgPrice: 200.00,
-      currentPrice: 185.50,
-      value: 5565,
-      gainLoss: -435,
-      gainLossPercent: -7.25,
-      allocation: 22.3
-    },
-    {
-      symbol: "NVDA",
-      quantity: 10,
-      avgPrice: 450.00,
-      currentPrice: 485.25,
-      value: 4852.50,
-      gainLoss: 352.50,
-      gainLossPercent: 7.83,
-      allocation: 19.4
-    }
-  ]);
-
-  const [metrics, setMetrics] = useState<PortfolioMetrics>({
-    totalValue: 125430.50,
-    totalGainLoss: 15640.25,
-    totalGainLossPercent: 12.47,
-    dayChange: 2340.75,
-    dayChangePercent: 1.90,
-    sharpeRatio: 1.25,
-    maxDrawdown: -8.5,
-    winRate: 67.3
+  const [holdings, setHoldings] = useState<Portfolio[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAddPositionOpen, setIsAddPositionOpen] = useState(false);
+  const [newPosition, setNewPosition] = useState({
+    symbol: "",
+    quantity: "",
+    avgPrice: "",
+    type: "STOCK"
   });
-
-  const [rebalanceNeeded, setRebalanceNeeded] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      setHoldings(prev => prev.map(holding => ({
-        ...holding,
-        currentPrice: holding.currentPrice * (1 + (Math.random() - 0.5) * 0.02),
-        value: holding.quantity * holding.currentPrice,
-        gainLoss: (holding.currentPrice - holding.avgPrice) * holding.quantity,
-        gainLossPercent: ((holding.currentPrice - holding.avgPrice) / holding.avgPrice) * 100
-      })));
-    }, 10000);
-
-    return () => clearInterval(interval);
+    fetchPortfolio();
   }, []);
+
+  const fetchPortfolio = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("portfolio")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setHoldings(data || []);
+    } catch (error) {
+      console.error("Error fetching portfolio:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch portfolio data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addPosition = async () => {
+    if (!newPosition.symbol || !newPosition.quantity || !newPosition.avgPrice) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("portfolio")
+        .insert([{
+          symbol: newPosition.symbol.toUpperCase(),
+          quantity: parseFloat(newPosition.quantity),
+          avg_price: parseFloat(newPosition.avgPrice),
+          current_price: parseFloat(newPosition.avgPrice), // Initial price same as avg
+          type: newPosition.type
+        }])
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        setHoldings([...holdings, ...data]);
+      }
+      setNewPosition({ symbol: "", quantity: "", avgPrice: "", type: "STOCK" });
+      setIsAddPositionOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Position added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding position:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add position",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deletePosition = async (id: number) => {
+    try {
+      const { error } = await supabase
+        .from("portfolio")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setHoldings(holdings.filter(h => h.id !== id));
+      toast({
+        title: "Success",
+        description: "Position deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting position:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete position",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const calculateMetrics = () => {
+    const totalValue = holdings.reduce((sum, holding) => sum + (holding.quantity * holding.current_price), 0);
+    const totalCost = holdings.reduce((sum, holding) => sum + (holding.quantity * holding.avg_price), 0);
+    const totalPnL = totalValue - totalCost;
+    const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+    
+    return { totalValue, totalPnL, totalPnLPercent };
+  };
+
+  const { totalValue, totalPnL, totalPnLPercent } = calculateMetrics();
 
   const getRiskLevel = (allocation: number) => {
     if (allocation > 30) return { level: "HIGH", color: "text-loss" };
@@ -129,24 +157,27 @@ const PortfolioManager = () => {
     return value >= 0 ? "text-profit" : "text-loss";
   };
 
-  const topPerformers = [...holdings].sort((a, b) => b.gainLossPercent - a.gainLossPercent).slice(0, 3);
-  const worstPerformers = [...holdings].sort((a, b) => a.gainLossPercent - b.gainLossPercent).slice(0, 3);
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Portfolio Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="h-4 w-4 text-primary" />
               <span className="text-sm text-muted-foreground">Portfolio Value</span>
             </div>
-            <div className="text-2xl font-bold">${metrics.totalValue.toLocaleString()}</div>
-            <div className={`text-sm flex items-center gap-1 ${getPerformanceColor(metrics.dayChange)}`}>
-              {metrics.dayChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              ${Math.abs(metrics.dayChange).toFixed(2)} ({metrics.dayChangePercent.toFixed(2)}%) today
-            </div>
+            <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -154,13 +185,13 @@ const PortfolioManager = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">Total Return</span>
+              <span className="text-sm text-muted-foreground">Total P&L</span>
             </div>
-            <div className={`text-2xl font-bold ${getPerformanceColor(metrics.totalGainLoss)}`}>
-              ${metrics.totalGainLoss.toLocaleString()}
+            <div className={`text-2xl font-bold ${getPerformanceColor(totalPnL)}`}>
+              {totalPnL >= 0 ? '+' : ''}${totalPnL.toLocaleString()}
             </div>
-            <div className={`text-sm ${getPerformanceColor(metrics.totalGainLoss)}`}>
-              {metrics.totalGainLossPercent.toFixed(2)}% all time
+            <div className={`text-sm ${getPerformanceColor(totalPnL)}`}>
+              {totalPnLPercent >= 0 ? '+' : ''}{totalPnLPercent.toFixed(2)}%
             </div>
           </CardContent>
         </Card>
@@ -168,220 +199,158 @@ const PortfolioManager = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">Sharpe Ratio</span>
+              <PieChart className="h-4 w-4 text-primary" />
+              <span className="text-sm text-muted-foreground">Positions</span>
             </div>
-            <div className="text-2xl font-bold">{metrics.sharpeRatio}</div>
-            <div className="text-sm text-muted-foreground">Risk-adjusted return</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">Max Drawdown</span>
-            </div>
-            <div className="text-2xl font-bold text-loss">{metrics.maxDrawdown}%</div>
-            <div className="text-sm text-muted-foreground">Largest peak-to-trough decline</div>
+            <div className="text-2xl font-bold">{holdings.length}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Rebalance Alert */}
-      {rebalanceNeeded && (
-        <Card className="border-warning bg-warning/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-warning" />
-                <div>
-                  <div className="font-semibold">Portfolio Rebalancing Recommended</div>
-                  <div className="text-sm text-muted-foreground">
-                    Some positions have drifted significantly from target allocations
-                  </div>
-                </div>
-              </div>
-              <Button variant="outline" size="sm">
-                View Recommendations
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Tabs defaultValue="holdings" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="holdings">Holdings</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="allocation">Allocation</TabsTrigger>
-          <TabsTrigger value="analysis">Analysis</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="holdings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Current Holdings
+      {/* Holdings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            Current Holdings
+            <Dialog open={isAddPositionOpen} onOpenChange={setIsAddPositionOpen}>
+              <DialogTrigger asChild>
                 <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Position
                 </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {holdings.map((holding) => {
-                  const risk = getRiskLevel(holding.allocation);
-                  return (
-                    <div key={holding.symbol} className="border border-border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="font-bold text-lg">{holding.symbol}</div>
-                          <Badge variant="outline">{holding.quantity} shares</Badge>
-                          <div className={`text-xs px-2 py-1 rounded ${risk.color} bg-current/10`}>
-                            {risk.level} CONCENTRATION
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold">${holding.value.toLocaleString()}</div>
-                          <div className="text-sm text-muted-foreground">{holding.allocation}% of portfolio</div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <div className="text-muted-foreground">Avg Cost</div>
-                          <div className="font-medium">${holding.avgPrice.toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">Current Price</div>
-                          <div className="font-medium">${holding.currentPrice.toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">Gain/Loss</div>
-                          <div className={`font-medium ${getPerformanceColor(holding.gainLoss)}`}>
-                            ${holding.gainLoss.toFixed(2)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-muted-foreground">Return</div>
-                          <div className={`font-medium ${getPerformanceColor(holding.gainLoss)}`}>
-                            {holding.gainLossPercent.toFixed(2)}%
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3">
-                        <Progress value={holding.allocation} className="h-2" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="performance" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-profit" />
-                  Top Performers
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {topPerformers.map((holding, index) => (
-                    <div key={holding.symbol} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium">{index + 1}.</div>
-                        <div className="font-semibold">{holding.symbol}</div>
-                      </div>
-                      <div className="text-profit font-medium">
-                        +{holding.gainLossPercent.toFixed(2)}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-loss" />
-                  Worst Performers
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {worstPerformers.map((holding, index) => (
-                    <div key={holding.symbol} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium">{index + 1}.</div>
-                        <div className="font-semibold">{holding.symbol}</div>
-                      </div>
-                      <div className="text-loss font-medium">
-                        {holding.gainLossPercent.toFixed(2)}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="allocation" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PieChart className="h-5 w-5" />
-                Portfolio Allocation
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {holdings.map((holding) => (
-                  <div key={holding.symbol} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{holding.symbol}</span>
-                      <span className="text-sm text-muted-foreground">{holding.allocation}%</span>
-                    </div>
-                    <Progress value={holding.allocation} className="h-3" />
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Position</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="symbol">Symbol</Label>
+                    <Input
+                      id="symbol"
+                      placeholder="AAPL"
+                      value={newPosition.symbol}
+                      onChange={(e) => setNewPosition({...newPosition, symbol: e.target.value})}
+                    />
                   </div>
-                ))}
+                  <div>
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      placeholder="100"
+                      value={newPosition.quantity}
+                      onChange={(e) => setNewPosition({...newPosition, quantity: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="avgPrice">Average Price</Label>
+                    <Input
+                      id="avgPrice"
+                      type="number"
+                      placeholder="150.50"
+                      value={newPosition.avgPrice}
+                      onChange={(e) => setNewPosition({...newPosition, avgPrice: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="type">Type</Label>
+                    <Select value={newPosition.type} onValueChange={(value) => setNewPosition({...newPosition, type: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="STOCK">Stock</SelectItem>
+                        <SelectItem value="CRYPTO">Crypto</SelectItem>
+                        <SelectItem value="ETF">ETF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => setIsAddPositionOpen(false)} variant="outline" className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button onClick={addPosition} className="flex-1">Add Position</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {holdings.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No positions found. Add your first position to get started.
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            ) : (
+              holdings.map((holding) => {
+                const currentValue = holding.quantity * holding.current_price;
+                const costBasis = holding.quantity * holding.avg_price;
+                const pnl = currentValue - costBasis;
+                const pnlPercent = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+                const allocation = totalValue > 0 ? (currentValue / totalValue) * 100 : 0;
+                const risk = getRiskLevel(allocation);
 
-        <TabsContent value="analysis" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-profit">{metrics.winRate}%</div>
-                <div className="text-sm text-muted-foreground">Win Rate</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{holdings.length}</div>
-                <div className="text-sm text-muted-foreground">Positions</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{Math.max(...holdings.map(h => h.allocation)).toFixed(1)}%</div>
-                <div className="text-sm text-muted-foreground">Largest Position</div>
-              </CardContent>
-            </Card>
+                return (
+                  <div key={holding.id} className="border border-border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="font-bold text-lg">{holding.symbol}</div>
+                        <Badge variant={holding.type === "STOCK" ? "default" : holding.type === "CRYPTO" ? "secondary" : "outline"}>
+                          {holding.type}
+                        </Badge>
+                        <div className={`text-xs px-2 py-1 rounded ${risk.color} bg-current/10`}>
+                          {risk.level} RISK
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="font-bold">${currentValue.toLocaleString()}</div>
+                          <div className="text-sm text-muted-foreground">{allocation.toFixed(1)}% allocation</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deletePosition(holding.id)}
+                          className="text-loss hover:text-loss"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <div className="text-muted-foreground">Quantity</div>
+                        <div className="font-medium">{holding.quantity}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Avg Price</div>
+                        <div className="font-medium">${holding.avg_price.toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Current Price</div>
+                        <div className="font-medium">${holding.current_price.toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">P&L</div>
+                        <div className={`font-medium ${getPerformanceColor(pnl)}`}>
+                          {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <Progress value={allocation} className="h-2" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };
