@@ -17,6 +17,10 @@ import PortfolioManager from "./PortfolioManager";
 import BacktestingEngine from "./BacktestingEngine";
 import UserSettings from "./UserSettings";
 import SignalGenerator from "./SignalGenerator";
+import RiskManager from "./RiskManager";
+import MarketScanner from "./MarketScanner";
+import TradingAlerts from "./TradingAlerts";
+import PerformanceAnalytics from "./PerformanceAnalytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +66,10 @@ useEffect(() => {
     { id: "generate", label: "Generate Signals", icon: Activity },
     { id: "backtest", label: "Backtesting", icon: Target },
     { id: "portfolio", label: "Portfolio", icon: DollarSign },
+    { id: "risk", label: "Risk Manager", icon: Target },
+    { id: "scanner", label: "Market Scanner", icon: Activity },
+    { id: "alerts", label: "Trading Alerts", icon: Zap },
+    { id: "analytics", label: "Performance", icon: BarChart3 },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -214,6 +222,10 @@ useEffect(() => {
             {activeSection === "generate" && <SignalGenerator />}
             {activeSection === "backtest" && <BacktestingEngine />}
             {activeSection === "portfolio" && <PortfolioManager />}
+            {activeSection === "risk" && <RiskManager />}
+            {activeSection === "scanner" && <MarketScanner />}
+            {activeSection === "alerts" && <TradingAlerts />}
+            {activeSection === "analytics" && <PerformanceAnalytics />}
             {activeSection === "settings" && <UserSettings />}
           </div>
         </main>
